@@ -1,0 +1,10 @@
+{
+  "name": "spin-arena",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Phaser Matter.js arena — spinning balls with swords and guns",
+  "scripts": {
+    "start": "npx --yes serve . -p 3000",
+    "test:manual": "node tests/smoke-test.js"
+  }
+}

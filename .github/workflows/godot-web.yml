@@ -1,0 +1,67 @@
+name: Publish Godot web build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "hello-godot/**"
+      - ".github/workflows/godot-web.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: godot-web
+  cancel-in-progress: true
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    env:
+      GODOT_VERSION: "4.7.2"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Install Godot and export templates
+        run: |
+          set -euo pipefail
+          V="${GODOT_VERSION}"
+          B="https://github.com/godotengine/godot/releases/download/${V}-stable"
+          curl -fsSL -o godot.zip "${B}/Godot_v${V}-stable_linux.x86_64.zip"
+          curl -fsSL -o templates.tpz "${B}/Godot_v${V}-stable_export_templates.tpz"
+          unzip -q godot.zip
+          chmod +x "Godot_v${V}-stable_linux.x86_64"
+          sudo mv "Godot_v${V}-stable_linux.x86_64" /usr/local/bin/godot
+          mkdir -p "${HOME}/.local/share/godot/export_templates/${V}.stable"
+          unzip -q templates.tpz
+          mv templates/* "${HOME}/.local/share/godot/export_templates/${V}.stable/"
+
+      - name: Export Web
+        working-directory: hello-godot
+        run: |
+          set -euo pipefail
+          mkdir -p build/web
+          godot --headless --path . --import
+          godot --headless --path . --export-release "Web" build/web/index.html
+          test -f build/web/index.html
+          test -f build/web/index.wasm
+
+      - name: Publish to hello/ on main
+        run: |
+          set -euo pipefail
+          rm -rf hello
+          mkdir -p hello
+          cp -R hello-godot/build/web/. hello/
+          touch hello/.nojekyll
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hello
+          if git diff --cached --quiet; then
+            echo "Web build matches hello/. Nothing to publish."
+            exit 0
+          fi
+          git commit -m "Publish Godot web build."
+          git push
